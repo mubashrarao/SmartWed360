@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&family=Cormorant+Garamond:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-cream font-body text-gray-800;
+    margin: 0;
+    padding: 0;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold;
+  }
+}
+
+@layer components {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-900 text-white px-6 py-3 rounded-lg font-semibold 
+           hover:bg-primary-800 transition-all duration-300 
+           hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 
+           focus:ring-gold-500 focus:ring-offset-2;
+  }
+  
+  .btn-gold {
+    @apply bg-gold-500 text-primary-900 px-6 py-3 rounded-lg font-semibold 
+           hover:bg-gold-600 transition-all duration-300 
+           hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 
+           focus:ring-primary-900 focus:ring-offset-2;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-lg overflow-hidden 
+           hover:shadow-2xl transition-all duration-300 
+           border border-gold-100 hover:border-gold-300;
+  }
+  
+  .section-title {
+    @apply text-4xl md:text-5xl font-heading font-bold text-primary-900 mb-4 
+           relative inline-block;
+  }
+  
+  .section-title::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-1/2 h-1 bg-gold-500 
+           transform -translate-x-0 transition-all duration-300;
+  }
+  
+  .section-title:hover::after {
+    @apply w-full;
+  }
+  
+  .gold-border {
+    @apply border-2 border-gold-500 rounded-lg;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg 
+           focus:outline-none focus:ring-2 focus:ring-gold-500 
+           focus:border-transparent transition-all duration-300;
+  }
+}
+
+/* React DatePicker Custom Styles */
+.react-datepicker-wrapper {
+  @apply w-full;
+}
+
+.react-datepicker__input-container input {
+  @apply input-field;
+}
+
+.react-datepicker {
+  @apply font-body border-2 border-gold-500 rounded-lg shadow-xl;
+}
+
+.react-datepicker__header {
+  @apply bg-primary-900 text-white;
+}
+
+.react-datepicker__current-month {
+  @apply text-white font-semibold;
+}
+
+.react-datepicker__day-name {
+  @apply text-gold-500;
+}
+
+.react-datepicker__day--selected {
+  @apply bg-gold-500 text-primary-900 rounded-full;
+}
+
+.react-datepicker__day--keyboard-selected {
+  @apply bg-gold-500 text-primary-900;
+}
