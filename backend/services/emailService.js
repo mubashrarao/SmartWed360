@@ -1,32 +1,36 @@
 const nodemailer = require('nodemailer');
 
-// Log email configuration on startup (without showing full password)
+// Log email configuration on startup
 console.log('📧 Email Configuration:');
-console.log('  Host:', process.env.EMAIL_HOST);
-console.log('  Port:', process.env.EMAIL_PORT);
+console.log('  Host:', process.env.EMAIL_HOST || 'smtp.gmail.com');
+console.log('  Port:', process.env.EMAIL_PORT || 465);
 console.log('  User:', process.env.EMAIL_USER);
 console.log('  Pass exists:', !!process.env.EMAIL_PASS);
 console.log('  From:', process.env.EMAIL_FROM);
 
-// Create transporter with better configuration
+// Create transporter with Render-compatible settings
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false, // true for 465, false for 587
+  port: parseInt(process.env.EMAIL_PORT) || 465,
+  secure: true, // Use SSL for port 465
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
+  family: 4, // Force IPv4 - CRITICAL for Render!
   tls: {
     rejectUnauthorized: false
-  }
+  },
+  connectionTimeout: 30000,
+  greetingTimeout: 30000,
+  socketTimeout: 30000
 });
 
-// Verify transporter connection on startup
+// Verify transporter connection
 transporter.verify((error, success) => {
   if (error) {
     console.error('❌ Email transporter error:', error.message);
-    console.error('   Please check your EMAIL_USER and EMAIL_PASS in .env file');
+    console.error('   Please check your EMAIL_USER and EMAIL_PASS');
   } else {
     console.log('✅ Email server is ready to send emails');
   }
@@ -106,10 +110,13 @@ const sendWelcomeEmail = async (email, name, role) => {
         <div class="content">
           <h2>Welcome ${name}!</h2>
           <div class="success-box">
-            <p><strong>✅ Your email has been successfully verified!</strong></p>
+            <p><strong>Your email has been successfully verified!</strong></p>
             <p>You are registered as a <strong>${role}</strong> on SmartWed 360.</p>
           </div>
           ${role === 'vendor' ? '<p>Your account is pending admin approval. You will receive an email once approved.</p>' : '<p>You can now start browsing venues!</p>'}
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL}/login" style="display: inline-block; padding: 12px 30px; background: #D4AF37; color: #800020; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Your Account</a>
+          </div>
         </div>
         <div class="footer">
           <p>© 2025 SmartWed 360. All rights reserved.</p>
@@ -155,7 +162,7 @@ const sendPendingApprovalEmail = async (email, name) => {
           <h2>Hello ${name},</h2>
           <p>Thank you for registering as a vendor!</p>
           <div class="pending-box">
-            <p><strong>📋 Account Status: Pending Approval</strong></p>
+            <p><strong>Account Status: Pending Approval</strong></p>
             <p>Your vendor account is pending admin approval. You will receive an email once approved.</p>
           </div>
         </div>
@@ -177,7 +184,7 @@ const sendPendingApprovalEmail = async (email, name) => {
   return transporter.sendMail(mailOptions);
 };
 
-// Send approval confirmation email
+// Send approval confirmation email to vendor
 const sendApprovalEmail = async (email, name) => {
   const html = `
     <!DOCTYPE html>
@@ -203,7 +210,7 @@ const sendApprovalEmail = async (email, name) => {
         <div class="content">
           <h2>Congratulations ${name}!</h2>
           <div class="success-box">
-            <p><strong>✅ Your vendor account has been APPROVED!</strong></p>
+            <p><strong>Your vendor account has been APPROVED!</strong></p>
             <p>You can now login and start listing your venues.</p>
           </div>
           <div style="text-align: center; margin: 30px 0;">
@@ -221,7 +228,7 @@ const sendApprovalEmail = async (email, name) => {
   const mailOptions = {
     from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: 'SmartWed 360 - Your Vendor Account is Approved! 🎉',
+    subject: 'SmartWed 360 - Your Vendor Account is Approved',
     html
   };
 
