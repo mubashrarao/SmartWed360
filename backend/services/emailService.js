@@ -1,46 +1,18 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-console.log('Email Configuration:');
-console.log('  Host:', process.env.EMAIL_HOST);
-console.log('  Port:', process.env.EMAIL_PORT);
-console.log('  User:', process.env.EMAIL_USER);
-console.log('  Pass exists:', !!process.env.EMAIL_PASS);
-console.log('  Secure:', process.env.EMAIL_SECURE);
+// Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Create transporter for port 465 (SSL)
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 465,
-  secure: process.env.EMAIL_SECURE === 'true' || true, // true for port 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  family: 4, // Force IPv4 - Important for Render
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000
-});
-
-// Verify transporter connection
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Email transporter error:', error.message);
-  } else {
-    console.log('Email server is ready on port 465');
-  }
-});
+console.log('Email Service: Resend initialized');
+console.log('  From email:', process.env.RESEND_FROM_EMAIL);
 
 // Send verification email with PIN code
 const sendVerificationEmail = async (email, pinCode) => {
-  console.log(`Attempting to send verification email to: ${email}`);
+  console.log(`Sending verification email to: ${email}`);
   
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: email,
       subject: 'Verify Your Email - SmartWed 360',
       html: `
@@ -66,16 +38,20 @@ const sendVerificationEmail = async (email, pinCode) => {
             <p>Your verification code expires in 10 minutes.</p>
             <p>If you did not request this, please ignore this email.</p>
             <div class="footer">
-              <p> 2025 SmartWed 360. All rights reserved.</p>
+              <p>© 2025 SmartWed 360. All rights reserved.</p>
             </div>
           </div>
         </body>
         </html>
       `
-    };
+    });
     
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Verification email sent successfully. Message ID:', info.messageId);
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+    
+    console.log('Verification email sent. ID:', data.id);
     return true;
   } catch (error) {
     console.error('Failed to send verification email:', error.message);
@@ -85,11 +61,11 @@ const sendVerificationEmail = async (email, pinCode) => {
 
 // Send welcome email
 const sendWelcomeEmail = async (email, name, role) => {
-  console.log(`Attempting to send welcome email to: ${email}`);
+  console.log(`Sending welcome email to: ${email}`);
   
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: email,
       subject: `Welcome to SmartWed 360${role === 'vendor' ? ' - Pending Approval' : ''}`,
       html: `
@@ -121,16 +97,20 @@ const sendWelcomeEmail = async (email, name, role) => {
               </div>
             </div>
             <div class="footer">
-              <p> 2025 SmartWed 360. All rights reserved.</p>
+              <p>© 2025 SmartWed 360. All rights reserved.</p>
             </div>
           </div>
         </body>
         </html>
       `
-    };
+    });
     
-    await transporter.sendMail(mailOptions);
-    console.log('Welcome email sent successfully to:', email);
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+    
+    console.log('Welcome email sent. ID:', data.id);
     return true;
   } catch (error) {
     console.error('Failed to send welcome email:', error.message);
@@ -140,11 +120,11 @@ const sendWelcomeEmail = async (email, name, role) => {
 
 // Send pending approval email
 const sendPendingApprovalEmail = async (email, name) => {
-  console.log(`Attempting to send pending approval email to: ${email}`);
+  console.log(`Sending pending approval email to: ${email}`);
   
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: email,
       subject: 'SmartWed 360 - Vendor Account Pending Approval',
       html: `
@@ -171,16 +151,20 @@ const sendPendingApprovalEmail = async (email, name) => {
               <p>You will receive an email once approved.</p>
             </div>
             <div class="footer">
-              <p> 2025 SmartWed 360. All rights reserved.</p>
+              <p>© 2025 SmartWed 360. All rights reserved.</p>
             </div>
           </div>
         </body>
         </html>
       `
-    };
+    });
     
-    await transporter.sendMail(mailOptions);
-    console.log('Pending approval email sent to:', email);
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+    
+    console.log('Pending approval email sent. ID:', data.id);
     return true;
   } catch (error) {
     console.error('Failed to send pending approval email:', error.message);
@@ -188,13 +172,13 @@ const sendPendingApprovalEmail = async (email, name) => {
   }
 };
 
-// Send approval email
+// Send approval confirmation email
 const sendApprovalEmail = async (email, name) => {
-  console.log(`Attempting to send approval email to: ${email}`);
+  console.log(`Sending approval email to: ${email}`);
   
   try {
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       to: email,
       subject: 'SmartWed 360 - Your Vendor Account is Approved',
       html: `
@@ -225,16 +209,20 @@ const sendApprovalEmail = async (email, name) => {
               <a href="${process.env.FRONTEND_URL}/login" class="button">Login to Your Account</a>
             </div>
             <div class="footer">
-              <p> 2025 SmartWed 360. All rights reserved.</p>
+              <p>© 2025 SmartWed 360. All rights reserved.</p>
             </div>
           </div>
         </body>
         </html>
       `
-    };
+    });
     
-    await transporter.sendMail(mailOptions);
-    console.log('Approval email sent to:', email);
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+    
+    console.log('Approval email sent. ID:', data.id);
     return true;
   } catch (error) {
     console.error('Failed to send approval email:', error.message);
