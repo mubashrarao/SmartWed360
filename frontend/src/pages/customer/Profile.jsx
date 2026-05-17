@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import TwoFactorSetup from '../../components/TwoFactorSetup';
 
 const CustomerProfile = () => {
   const { user, updateUser } = useAuth();
@@ -28,7 +29,6 @@ const CustomerProfile = () => {
     });
   };
 
-  // FIXED: Complete handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -40,7 +40,6 @@ const CustomerProfile = () => {
       });
       
       if (response.data.success) {
-        // Update local storage and context
         const updatedUser = { ...user, name: formData.name, phone: formData.phone };
         localStorage.setItem('user', JSON.stringify(updatedUser));
         if (updateUser) {
@@ -184,6 +183,12 @@ const CustomerProfile = () => {
               </div>
             )}
           </div>
+
+          {/* ===== 2FA SECTION - ADDED HERE ===== */}
+          <div className="px-8 pb-8">
+            <TwoFactorSetup />
+          </div>
+          {/* ===== END OF 2FA SECTION ===== */}
         </motion.div>
       </div>
     </div>

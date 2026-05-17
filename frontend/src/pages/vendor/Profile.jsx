@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import TwoFactorSetup from '../../components/TwoFactorSetup';
 
 const VendorProfile = () => {
   const { user, updateUser } = useAuth();
@@ -219,60 +220,68 @@ const VendorProfile = () => {
                 </div>
               </form>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <EnvelopeIcon className="w-5 h-5 text-gold-500" />
-                  <span className="text-gray-600">{user.email}</span>
+              <div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <EnvelopeIcon className="w-5 h-5 text-gold-500" />
+                    <span className="text-gray-600">{user.email}</span>
+                  </div>
+                  {user.phone && (
+                    <div className="flex items-center gap-3">
+                      <PhoneIcon className="w-5 h-5 text-gold-500" />
+                      <span className="text-gray-600">{user.phone}</span>
+                    </div>
+                  )}
+                  {user.businessName && (
+                    <div className="flex items-center gap-3">
+                      <BuildingOfficeIcon className="w-5 h-5 text-gold-500" />
+                      <span className="text-gray-600">{user.businessName}</span>
+                    </div>
+                  )}
+                  {user.businessAddress && (
+                    <div className="flex items-center gap-3">
+                      <BuildingOfficeIcon className="w-5 h-5 text-gold-500" />
+                      <span className="text-gray-600">{user.businessAddress}</span>
+                    </div>
+                  )}
+
+                  {/* Pending Approval Message */}
+                  {user?.status === 'pending' && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                      <div className="flex items-start gap-3">
+                        <ClockIcon className="w-5 h-5 text-yellow-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-yellow-800 mb-1">Account Pending Approval</h4>
+                          <p className="text-sm text-yellow-700">
+                            Your vendor account is awaiting admin approval. You will be able to list venues once approved.
+                            You will receive an email notification when your account is approved.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Account Message */}
+                  {user?.status === 'active' && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                      <div className="flex items-start gap-3">
+                        <CheckIcon className="w-5 h-5 text-green-600 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-green-800 mb-1">Account Active</h4>
+                          <p className="text-sm text-green-700">
+                            Your vendor account is active. You can now add venues and manage bookings.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {user.phone && (
-                  <div className="flex items-center gap-3">
-                    <PhoneIcon className="w-5 h-5 text-gold-500" />
-                    <span className="text-gray-600">{user.phone}</span>
-                  </div>
-                )}
-                {user.businessName && (
-                  <div className="flex items-center gap-3">
-                    <BuildingOfficeIcon className="w-5 h-5 text-gold-500" />
-                    <span className="text-gray-600">{user.businessName}</span>
-                  </div>
-                )}
-                {user.businessAddress && (
-                  <div className="flex items-center gap-3">
-                    <BuildingOfficeIcon className="w-5 h-5 text-gold-500" />
-                    <span className="text-gray-600">{user.businessAddress}</span>
-                  </div>
-                )}
 
-                {/* Pending Approval Message */}
-                {user?.status === 'pending' && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-                    <div className="flex items-start gap-3">
-                      <ClockIcon className="w-5 h-5 text-yellow-600 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-yellow-800 mb-1">Account Pending Approval</h4>
-                        <p className="text-sm text-yellow-700">
-                          Your vendor account is awaiting admin approval. You will be able to list venues once approved.
-                          You will receive an email notification when your account is approved.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Active Account Message */}
-                {user?.status === 'active' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
-                    <div className="flex items-start gap-3">
-                      <CheckIcon className="w-5 h-5 text-green-600 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-green-800 mb-1">Account Active</h4>
-                        <p className="text-sm text-green-700">
-                          Your vendor account is active. You can now add venues and manage bookings.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* ===== 2FA SECTION - ADDED HERE ===== */}
+                <div className="mt-8 pt-6 border-t border-gray-200">
+                  <TwoFactorSetup />
+                </div>
+                {/* ===== END OF 2FA SECTION ===== */}
               </div>
             )}
           </div>
