@@ -1,7 +1,7 @@
 const Notification = require('../models/Notification');
-const { sendEmail } = require('./emailService');
+const { sendVerificationEmail, sendApprovalEmail, sendPaymentConfirmation } = require('./emailService');
 
-// Create notification
+// Create notification (in-app only)
 const createNotification = async (userId, type, title, message, data = {}, priority = 'medium') => {
   try {
     const notification = await Notification.create({
@@ -12,7 +12,7 @@ const createNotification = async (userId, type, title, message, data = {}, prior
       data,
       priority
     });
-
+    console.log(`Notification created for user ${userId}: ${title}`);
     return notification;
   } catch (error) {
     console.error('Create notification error:', error);
@@ -20,10 +20,11 @@ const createNotification = async (userId, type, title, message, data = {}, prior
   }
 };
 
-// Send notification with email
+// Send notification with email (simplified - just create notification)
+// Email is sent separately via dedicated email functions
 const sendNotification = async (user, type, title, message, data = {}, priority = 'medium') => {
   try {
-    // Create in-app notification
+    // Create in-app notification only
     const notification = await createNotification(
       user._id,
       type,
@@ -32,22 +33,6 @@ const sendNotification = async (user, type, title, message, data = {}, priority 
       data,
       priority
     );
-
-    // Send email if user has email
-    if (user.email) {
-      const emailSent = await sendEmail(user.email, type, {
-        ...data,
-        customerName: user.name,
-        vendorName: user.name
-      });
-
-      // Update notification if email was sent
-      if (emailSent && notification) {
-        notification.isEmailSent = true;
-        await notification.save();
-      }
-    }
-
     return notification;
   } catch (error) {
     console.error('Send notification error:', error);
@@ -68,8 +53,8 @@ const notifyVendorNewBooking = async (vendor, booking) => {
     {
       bookingId: booking._id,
       venueName: booking.venue.name,
-      customerName: booking.customer.name,
-      eventDate: booking.eventDate.toLocaleDateString(),
+      customerName: booking.customer?.name || 'Customer',
+      eventDate: booking.eventDate?.toLocaleDateString(),
       guestCount: booking.guestCount,
       totalPrice: booking.totalPrice,
       specialRequests: booking.specialRequests
@@ -78,43 +63,65 @@ const notifyVendorNewBooking = async (vendor, booking) => {
   );
 };
 
-// Send booking approved notification to customer
-const notifyCustomerBookingApproved = async (customer, booking) => {
-  const title = 'Booking Approved!';
-  const message = `Your booking for ${booking.venue.name} has been approved`;
+// Send booking waiting for payment notification to customer
+const notifyCustomerWaitingPayment = async (customer, booking) => {
+  const title = 'Payment Required';
+  const message = `Your booking for ${booking.venue.name} has been approved. Please pay 20% advance to confirm.`;
   
   return sendNotification(
     customer,
-    'booking_approved',
+    'payment_required',
     title,
     message,
     {
       bookingId: booking._id,
       venueName: booking.venue.name,
-      eventDate: booking.eventDate.toLocaleDateString(),
-      guestCount: booking.guestCount,
+      eventDate: booking.eventDate?.toLocaleDateString(),
       totalPrice: booking.totalPrice,
+      advanceAmount: Math.round(booking.totalPrice * 0.2),
       vendorNotes: booking.vendorNotes
     },
     'high'
   );
 };
 
-// Send booking rejected notification to customer
-const notifyCustomerBookingRejected = async (customer, booking) => {
-  const title = 'Booking Update';
-  const message = `Your booking request for ${booking.venue.name} has been declined`;
+// Send booking confirmed notification to customer
+const notifyCustomerBookingConfirmed = async (customer, booking) => {
+  const title = 'Booking Confirmed!';
+  const message = `Your booking for ${booking.venue.name} has been confirmed. Advance payment received.`;
   
   return sendNotification(
     customer,
-    'booking_rejected',
+    'booking_confirmed',
     title,
     message,
     {
       bookingId: booking._id,
       venueName: booking.venue.name,
-      eventDate: booking.eventDate.toLocaleDateString(),
-      vendorNotes: booking.vendorNotes || 'No specific reason provided'
+      eventDate: booking.eventDate?.toLocaleDateString(),
+      totalPrice: booking.totalPrice,
+      advancePaid: booking.advancePayment
+    },
+    'high'
+  );
+};
+
+// Send payment received notification to vendor
+const notifyVendorPaymentReceived = async (vendor, customer, booking) => {
+  const title = 'Payment Received';
+  const message = `Customer ${customer.name} has paid advance for booking at ${booking.venue.name}. Booking is now confirmed.`;
+  
+  return sendNotification(
+    vendor,
+    'payment_received',
+    title,
+    message,
+    {
+      bookingId: booking._id,
+      customerName: customer.name,
+      venueName: booking.venue.name,
+      eventDate: booking.eventDate?.toLocaleDateString(),
+      advanceAmount: booking.advancePayment
     },
     'high'
   );
@@ -122,8 +129,15 @@ const notifyCustomerBookingRejected = async (customer, booking) => {
 
 // Send vendor approved notification
 const notifyVendorApproved = async (vendor) => {
-  const title = 'Account Approved!';
-  const message = 'Congratulations! Your vendor account has been approved';
+  const title = 'Account Approved';
+  const message = 'Congratulations! Your vendor account has been approved. You can now login and start listing your venues.';
+  
+  // Send email separately
+  try {
+    await sendApprovalEmail(vendor.email, vendor.name);
+  } catch (emailError) {
+    console.error('Approval email failed:', emailError.message);
+  }
   
   return sendNotification(
     vendor,
@@ -151,7 +165,7 @@ const sendBookingReminder = async (customer, booking) => {
     {
       bookingId: booking._id,
       venueName: booking.venue.name,
-      eventDate: booking.eventDate.toLocaleDateString(),
+      eventDate: booking.eventDate?.toLocaleDateString(),
       venueAddress: booking.venue.address,
       venueContact: booking.venue.contactPhone
     },
@@ -163,8 +177,9 @@ module.exports = {
   createNotification,
   sendNotification,
   notifyVendorNewBooking,
-  notifyCustomerBookingApproved,
-  notifyCustomerBookingRejected,
+  notifyCustomerWaitingPayment,
+  notifyCustomerBookingConfirmed,
+  notifyVendorPaymentReceived,
   notifyVendorApproved,
   sendBookingReminder
 };

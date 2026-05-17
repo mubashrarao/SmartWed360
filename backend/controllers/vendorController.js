@@ -2,7 +2,8 @@ const Venue = require('../models/Venue');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const Category = require('../models/Category');
-const Notification = require('../models/Notification');
+const Notification = require('../models/Notification'); 
+const { sendApprovalEmail } = require('../services/emailService');
 
 // @desc    Get vendor dashboard stats
 const getVendorStats = async (req, res) => {
@@ -76,12 +77,8 @@ const getVendorVenue = async (req, res) => {
 // @desc    Create new venue
 const createVenue = async (req, res) => {
   try {
-    const { 
-      name, description, category, basePrice, capacity, city, 
-      address, contactPhone, contactEmail, amenities, eventTypes, facilities 
-    } = req.body;
+    const { name, description, category, price, capacity, city, address, contactPhone, contactEmail, amenities } = req.body;
     
-    // Check if vendor is approved
     const vendor = await User.findById(req.user.id);
     if (vendor.status !== 'active') {
       return res.status(403).json({ 
@@ -90,7 +87,6 @@ const createVenue = async (req, res) => {
       });
     }
 
-    // Handle uploaded images
     let images = [];
     if (req.files && req.files.length > 0) {
       images = req.files.map(file => ({
@@ -99,11 +95,7 @@ const createVenue = async (req, res) => {
       }));
     }
 
-    // Parse arrays if they come as strings
     let amenitiesArray = amenities;
-    let eventTypesArray = eventTypes;
-    let facilitiesArray = facilities;
-    
     if (typeof amenities === 'string') {
       try {
         amenitiesArray = JSON.parse(amenities);
@@ -111,45 +103,21 @@ const createVenue = async (req, res) => {
         amenitiesArray = amenities ? [amenities] : [];
       }
     }
-    
-    if (typeof eventTypes === 'string') {
-      try {
-        eventTypesArray = JSON.parse(eventTypes);
-      } catch (e) {
-        eventTypesArray = [];
-      }
-    }
-    
-    if (typeof facilities === 'string') {
-      try {
-        facilitiesArray = JSON.parse(facilities);
-      } catch (e) {
-        facilitiesArray = [];
-      }
-    }
 
-    const venueData = {
+    const venue = await Venue.create({
       vendor: req.user.id,
       name,
       description,
       category,
+      price: Number(price),
       capacity: Number(capacity),
       city,
       address,
       contactPhone,
-      contactEmail: contactEmail || '',
+      contactEmail,
       amenities: amenitiesArray || [],
-      images,
-      eventTypes: eventTypesArray || [],
-      facilities: facilitiesArray || []
-    };
-    
-    // Only add basePrice if provided
-    if (basePrice) {
-      venueData.basePrice = Number(basePrice);
-    }
-
-    const venue = await Venue.create(venueData);
+      images
+    });
 
     res.status(201).json({
       success: true,
@@ -160,7 +128,7 @@ const createVenue = async (req, res) => {
     console.error('Create venue error:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Server error: ' + error.message,
+      message: 'Server error',
       error: error.message 
     });
   }
@@ -211,61 +179,40 @@ const deleteVenue = async (req, res) => {
   }
 };
 
-// @desc    Upload venue images
-const uploadVenueImages = async (req, res) => {
-  try {
-    const venue = await Venue.findOne({ 
-      _id: req.params.id, 
-      vendor: req.user.id 
-    });
-
-    if (!venue) {
-      return res.status(404).json({ success: false, message: 'Venue not found' });
-    }
-
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'Please upload at least one image' });
-    }
-
-    const images = req.files.map(file => ({
-      url: file.path,
-      publicId: file.filename
-    }));
-
-    venue.images = [...venue.images, ...images];
-    await venue.save();
-
-    res.json({
-      success: true,
-      message: `${images.length} image(s) uploaded successfully`,
-      data: venue
-    });
-  } catch (error) {
-    console.error('Upload images error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
-
 // @desc    Get vendor bookings
 const getVendorBookings = async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, page = 1, limit = 10 } = req.query;
+    
     const filter = { vendor: req.user.id };
     if (status) filter.status = status;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const bookings = await Booking.find(filter)
       .populate('customer', 'name email phone')
       .populate('venue', 'name price capacity city images')
-      .sort('-createdAt');
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(parseInt(limit));
 
-    const pendingCount = await Booking.countDocuments({ vendor: req.user.id, status: 'pending' });
-    const approvedCount = await Booking.countDocuments({ vendor: req.user.id, status: 'approved' });
-    const completedCount = await Booking.countDocuments({ vendor: req.user.id, status: 'completed' });
+    const total = await Booking.countDocuments(filter);
+
+    const stats = {
+      pending: await Booking.countDocuments({ vendor: req.user.id, status: 'pending' }),
+      waiting_payment: await Booking.countDocuments({ vendor: req.user.id, status: 'waiting_payment' }),
+      approved: await Booking.countDocuments({ vendor: req.user.id, status: 'approved' }),
+      completed: await Booking.countDocuments({ vendor: req.user.id, status: 'completed' }),
+      total: bookings.length
+    };
 
     res.json({
       success: true,
       count: bookings.length,
-      stats: { pending: pendingCount, approved: approvedCount, completed: completedCount, total: bookings.length },
+      total,
+      stats,
+      page: parseInt(page),
+      pages: Math.ceil(total / parseInt(limit)),
       data: bookings
     });
   } catch (error) {
@@ -274,7 +221,7 @@ const getVendorBookings = async (req, res) => {
   }
 };
 
-// @desc    Update booking status
+// @desc    Update booking status (Vendor)
 const updateBookingStatus = async (req, res) => {
   try {
     const { status, vendorNotes } = req.body;
@@ -293,7 +240,7 @@ const updateBookingStatus = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    // FIX: When vendor approves, set to 'waiting_payment' instead of 'approved'
+    // When vendor approves, set to 'waiting_payment'
     let finalStatus = status;
     if (status === 'approved') {
       finalStatus = 'waiting_payment';
@@ -303,26 +250,27 @@ const updateBookingStatus = async (req, res) => {
     if (vendorNotes) booking.vendorNotes = vendorNotes;
     await booking.save();
 
-    // Send notification to customer about payment required
+    // Send notification to customer
     if (finalStatus === 'waiting_payment') {
       await Notification.create({
         user: booking.customer._id,
         type: 'payment_required',
         title: 'Payment Required',
-        message: `Your booking for ${booking.venue.name} has been approved by vendor. Please pay 20% advance to confirm your booking.`,
+        message: `Your booking for ${booking.venue.name} has been approved. Please pay 20% advance to confirm.`,
         data: { bookingId: booking._id },
         priority: 'high'
       });
+      console.log(`Payment required notification sent to customer: ${booking.customer.email}`);
     }
 
     res.json({ 
       success: true, 
-      message: `Booking ${status === 'approved' ? 'approved, waiting for payment' : status} successfully`, 
+      message: `Booking ${status === 'approved' ? 'approved, waiting for payment' : status}`, 
       data: booking 
     });
   } catch (error) {
     console.error('Update booking status error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
@@ -344,7 +292,6 @@ module.exports = {
   createVenue,
   updateVenue,
   deleteVenue,
-  uploadVenueImages,
   getVendorBookings,
   updateBookingStatus,
   getCategories

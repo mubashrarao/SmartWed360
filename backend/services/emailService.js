@@ -229,61 +229,65 @@ const sendApprovalEmail = async (email, name) => {
     return false;
   }
 };
-// Send payment confirmation email
+
+// ============ FIXED: Send payment confirmation email using Resend ============
 const sendPaymentConfirmation = async (customer, booking) => {
+  console.log(`Sending payment confirmation email to: ${customer.email}`);
+  
   try {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Booking Confirmed - SmartWed 360</title>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: #800020; color: #D4AF37; padding: 20px; text-align: center; }
-          .content { padding: 30px; background: #fff; border: 1px solid #e0e0e0; border-radius: 0 0 10px 10px; }
-          .success-box { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0; }
-          .button { display: inline-block; padding: 12px 30px; background: #D4AF37; color: #800020; text-decoration: none; border-radius: 5px; font-weight: bold; }
-          .footer { text-align: center; padding: 20px; font-size: 12px; color: #999; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>SmartWed 360</h1>
-          </div>
-          <div class="content">
-            <h2>Congratulations ${customer.name}!</h2>
+    const { data, error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+      to: customer.email,
+      subject: 'Booking Confirmed - SmartWed 360',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Booking Confirmed</title>
+          <style>
+            body { font-family: Arial, sans-serif; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #800020; color: #D4AF37; padding: 20px; text-align: center; }
+            .success-box { background: #d4edda; padding: 15px; margin: 20px 0; border-radius: 5px; }
+            .button { background: #D4AF37; color: #800020; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; }
+            .footer { text-align: center; padding: 20px; font-size: 12px; color: #999; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>SmartWed 360</h1>
+            </div>
             <div class="success-box">
-              <p><strong>Your booking has been CONFIRMED!</strong></p>
-              <p>Venue: ${booking.venue.name}</p>
-              <p>Event Date: ${new Date(booking.eventDate).toLocaleDateString()}</p>
-              <p>Advance Payment: Rs. ${booking.advancePayment.toLocaleString()}</p>
-              <p>Remaining Amount: Rs. ${(booking.totalPrice - booking.advancePayment).toLocaleString()}</p>
+              <h3>Congratulations ${customer.name}!</h3>
+              <p>Your booking has been <strong>CONFIRMED</strong>!</p>
+              <p><strong>Venue:</strong> ${booking.venue.name}</p>
+              <p><strong>Event Date:</strong> ${new Date(booking.eventDate).toLocaleDateString()}</p>
+              <p><strong>Advance Payment:</strong> Rs. ${booking.advancePayment?.toLocaleString() || 0}</p>
+              <p><strong>Remaining Amount:</strong> Rs. ${((booking.totalPrice || 0) - (booking.advancePayment || 0)).toLocaleString()}</p>
             </div>
             <div style="text-align: center; margin: 30px 0;">
               <a href="${process.env.FRONTEND_URL}/customer/bookings" class="button">View My Bookings</a>
             </div>
+            <div class="footer">
+              <p>© 2025 SmartWed 360. All rights reserved.</p>
+            </div>
           </div>
-          <div class="footer">
-            <p> 2025 SmartWed 360. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-    
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
-      to: customer.email,
-      subject: 'Booking Confirmed - SmartWed 360',
-      html
+        </body>
+        </html>
+      `
     });
-    console.log('Payment confirmation email sent to:', customer.email);
+    
+    if (error) {
+      console.error('Resend error:', error);
+      return false;
+    }
+    
+    console.log('Payment confirmation email sent. ID:', data.id);
     return true;
   } catch (error) {
-    console.error('Payment confirmation email failed:', error.message);
+    console.error('Failed to send payment confirmation email:', error.message);
     return false;
   }
 };

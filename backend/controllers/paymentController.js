@@ -19,8 +19,10 @@ const createPaymentIntent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
     
+    // Calculate advance amount (20% of total by default)
     const advanceAmount = (booking.totalPrice * advancePercentage) / 100;
     
+    // Create payment intent with Stripe
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(advanceAmount * 100),
       currency: 'pkr',
@@ -32,6 +34,7 @@ const createPaymentIntent = async (req, res) => {
       description: `Advance payment for ${booking.venue.name}`
     });
     
+    // Create payment record
     const payment = await Payment.create({
       booking: bookingId,
       customer: req.user.id,
@@ -42,6 +45,7 @@ const createPaymentIntent = async (req, res) => {
       status: 'pending'
     });
     
+    // Update booking with payment info
     booking.advancePayment = advanceAmount;
     booking.paymentStatus = 'partial';
     booking.paymentId = payment._id;
@@ -109,7 +113,7 @@ const confirmPayment = async (req, res) => {
       user: booking.customer._id,
       type: 'booking_confirmed',
       title: 'Booking Confirmed!',
-      message: `Your booking for ${booking.venue.name} has been confirmed. Your advance payment of Rs. ${payment.advanceAmount.toLocaleString()} has been received.`,
+      message: `Your booking for ${booking.venue.name} has been confirmed. Advance payment of Rs. ${payment.advanceAmount.toLocaleString()} received.`,
       data: { bookingId: booking._id },
       priority: 'high'
     });
@@ -119,7 +123,7 @@ const confirmPayment = async (req, res) => {
       user: booking.vendor._id,
       type: 'payment_received',
       title: 'Payment Received',
-      message: `Customer ${booking.customer.name} has paid advance for booking at ${booking.venue.name}. Booking is now confirmed.`,
+      message: `Customer ${booking.customer.name} paid advance for ${booking.venue.name}. Booking confirmed.`,
       data: { bookingId: booking._id },
       priority: 'high'
     });
