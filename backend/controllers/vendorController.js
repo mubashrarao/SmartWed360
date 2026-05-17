@@ -278,35 +278,47 @@ const updateBookingStatus = async (req, res) => {
   try {
     const { status, vendorNotes } = req.body;
     
-    const booking = await Booking.findOne({ 
-      _id: req.params.id, 
-      vendor: req.user.id 
-    }).populate('customer').populate('venue');
+    const booking = await Booking.findById(req.params.id)
+      .populate('customer')
+      .populate('venue')
+      .populate('vendor');
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    const validTransitions = {
-      'pending': ['approved', 'rejected'],
-      'approved': ['completed', 'cancelled'],
-      'rejected': [],
-      'cancelled': [],
-      'completed': []
-    };
-
-    if (!validTransitions[booking.status].includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot change status from ${booking.status} to ${status}`
-      });
+    // Check if user is the vendor
+    if (booking.vendor._id.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    booking.status = status;
+    // FIX: When vendor approves, set to 'waiting_payment' instead of 'approved'
+    let finalStatus = status;
+    if (status === 'approved') {
+      finalStatus = 'waiting_payment';
+    }
+
+    booking.status = finalStatus;
     if (vendorNotes) booking.vendorNotes = vendorNotes;
     await booking.save();
 
-    res.json({ success: true, message: `Booking ${status} successfully`, data: booking });
+    // Send notification to customer about payment required
+    if (finalStatus === 'waiting_payment') {
+      await Notification.create({
+        user: booking.customer._id,
+        type: 'payment_required',
+        title: 'Payment Required',
+        message: `Your booking for ${booking.venue.name} has been approved by vendor. Please pay 20% advance to confirm your booking.`,
+        data: { bookingId: booking._id },
+        priority: 'high'
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Booking ${status === 'approved' ? 'approved, waiting for payment' : status} successfully`, 
+      data: booking 
+    });
   } catch (error) {
     console.error('Update booking status error:', error);
     res.status(500).json({ success: false, message: 'Server error' });

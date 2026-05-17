@@ -79,10 +79,11 @@ const CustomerBookings = () => {
     }
   };
 
-  // Get status badge style
+  // ============ UPDATED STATUS BADGE WITH WAITING_PAYMENT ============
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      waiting_payment: 'bg-orange-100 text-orange-800 border-orange-200',
       approved: 'bg-green-100 text-green-800 border-green-200',
       rejected: 'bg-red-100 text-red-800 border-red-200',
       cancelled: 'bg-gray-100 text-gray-800 border-gray-200',
@@ -91,10 +92,11 @@ const CustomerBookings = () => {
     return styles[status] || styles.pending;
   };
 
-  // Get status icon
+  // ============ UPDATED STATUS ICON WITH WAITING_PAYMENT ============
   const getStatusIcon = (status) => {
     switch(status) {
       case 'pending': return <ClockIcon className="w-4 h-4" />;
+      case 'waiting_payment': return <CreditCardIcon className="w-4 h-4" />;
       case 'approved': return <CheckCircleIcon className="w-4 h-4" />;
       case 'rejected': return <XMarkIcon className="w-4 h-4" />;
       case 'cancelled': return <XMarkIcon className="w-4 h-4" />;
@@ -122,9 +124,9 @@ const CustomerBookings = () => {
           </p>
         </div>
 
-        {/* Filter Tabs */}
+        {/* Filter Tabs - Add waiting_payment to tabs */}
         <div className="flex flex-wrap gap-2 mb-8 overflow-x-auto pb-2">
-          {['all', 'pending', 'approved', 'rejected', 'cancelled', 'completed'].map((status) => (
+          {['all', 'pending', 'waiting_payment', 'approved', 'rejected', 'cancelled', 'completed'].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
@@ -134,7 +136,7 @@ const CustomerBookings = () => {
                   : 'bg-white text-gray-600 hover:bg-gold-100'
               }`}
             >
-              {status}
+              {status === 'waiting_payment' ? 'Waiting Payment' : status}
             </button>
           ))}
         </div>
@@ -183,7 +185,7 @@ const CustomerBookings = () => {
                         </div>
                         <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusBadge(booking.status)}`}>
                           {getStatusIcon(booking.status)}
-                          {booking.status.toUpperCase()}
+                          {booking.status === 'waiting_payment' ? 'WAITING PAYMENT' : booking.status.toUpperCase()}
                         </span>
                       </div>
 
@@ -249,10 +251,10 @@ const CustomerBookings = () => {
                         </div>
                       )}
 
-                      {/* Action Buttons */}
+                      {/* ============ UPDATED PAYMENT BUTTON FOR WAITING_PAYMENT STATUS ============ */}
                       <div className="flex flex-wrap gap-3 mt-4">
-                        {/* Pay Advance Button - For approved bookings with pending payment */}
-                        {booking.status === 'approved' && booking.paymentStatus !== 'paid' && (
+                        {/* Pay Advance Button - For waiting_payment bookings */}
+                        {booking.status === 'waiting_payment' && booking.paymentStatus !== 'paid' && (
                           <button
                             onClick={() => {
                               setSelectedBooking(booking);
@@ -261,7 +263,7 @@ const CustomerBookings = () => {
                             className="flex items-center gap-2 px-4 py-2 bg-gold-500 text-primary-900 rounded-lg hover:bg-gold-600 transition-colors"
                           >
                             <CreditCardIcon className="w-4 h-4" />
-                            Pay Advance (20%)
+                            Pay Advance (20%) to Confirm
                           </button>
                         )}
 

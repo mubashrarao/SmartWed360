@@ -229,10 +229,53 @@ const sendApprovalEmail = async (email, name) => {
     return false;
   }
 };
+// Send payment confirmation email
+const sendPaymentConfirmation = async (customer, booking) => {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Booking Confirmed - SmartWed 360</title>
+      <style>
+        body { font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #800020; color: #D4AF37; padding: 20px; text-align: center; }
+        .content { padding: 30px; border: 1px solid #ddd; }
+        .button { background: #D4AF37; color: #800020; padding: 12px 30px; text-decoration: none; border-radius: 5px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>SmartWed 360</h1>
+        </div>
+        <div class="content">
+          <h2>Congratulations ${customer.name}!</h2>
+          <p>Your booking for <strong>${booking.venue.name}</strong> has been confirmed!</p>
+          <p>Advance Payment: Rs. ${booking.advancePayment.toLocaleString()}</p>
+          <p>Remaining Amount: Rs. ${(booking.totalPrice - booking.advancePayment).toLocaleString()}</p>
+          <p>Event Date: ${new Date(booking.eventDate).toLocaleDateString()}</p>
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.FRONTEND_URL}/customer/bookings" class="button">View Booking Details</a>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: customer.email,
+    subject: 'Booking Confirmed - SmartWed 360',
+    html
+  });
+};
 
 module.exports = { 
   sendVerificationEmail, 
   sendWelcomeEmail, 
   sendPendingApprovalEmail,
-  sendApprovalEmail 
+  sendApprovalEmail,
+  sendPaymentConfirmation 
 };

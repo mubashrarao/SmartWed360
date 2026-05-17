@@ -63,24 +63,56 @@ const confirmPayment = async (req, res) => {
   try {
     const { paymentIntentId, bookingId } = req.body;
     
+    // Retrieve payment intent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
     if (paymentIntent.status !== 'succeeded') {
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
     
+    // Update payment record
     const payment = await Payment.findOne({ paymentIntentId });
     payment.status = 'paid';
     payment.transactionId = paymentIntent.id;
     await payment.save();
     
-    const booking = await Booking.findById(bookingId);
+    // Update booking - CHANGE STATUS TO 'approved' AFTER PAYMENT
+    const booking = await Booking.findById(bookingId)
+      .populate('customer')
+      .populate('venue')
+      .populate('vendor');
+    
     booking.paymentStatus = 'paid';
+    booking.advancePayment = payment.advanceAmount;
+    booking.status = 'approved';  // Booking is now confirmed
     await booking.save();
+    
+    // Send confirmation email
+    await sendPaymentConfirmation(booking.customer, booking);
+    
+    // Send notification to customer
+    await Notification.create({
+      user: booking.customer._id,
+      type: 'booking_confirmed',
+      title: 'Booking Confirmed!',
+      message: `Your booking for ${booking.venue.name} has been confirmed. Your advance payment of Rs. ${payment.advanceAmount.toLocaleString()} has been received.`,
+      data: { bookingId: booking._id },
+      priority: 'high'
+    });
+    
+    // Send notification to vendor
+    await Notification.create({
+      user: booking.vendor._id,
+      type: 'payment_received',
+      title: 'Payment Received',
+      message: `Customer ${booking.customer.name} has paid advance for booking at ${booking.venue.name}. Booking is now confirmed.`,
+      data: { bookingId: booking._id },
+      priority: 'high'
+    });
     
     res.json({
       success: true,
-      message: 'Payment confirmed successfully',
+      message: 'Payment confirmed! Your booking is now confirmed.',
       paymentId: payment._id
     });
   } catch (error) {
