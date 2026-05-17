@@ -6,7 +6,8 @@ import {
   LockClosedIcon, 
   HeartIcon,
   EyeIcon,
-  EyeSlashIcon
+  EyeSlashIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
 import toast from 'react-hot-toast';
@@ -16,6 +17,9 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [tempToken, setTempToken] = useState(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -23,58 +27,123 @@ const Login = () => {
     setLoading(true);
 
     try {
-      console.log('Attempting login with:', email);
-      
       const response = await api.post('/auth/login', { email, password });
-      
-      console.log('Login response:', response.data);
       
       if (response.data.success) {
         const { token, ...userData } = response.data.data;
         
-        // Save to localStorage
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
-        
-        // Set default header for future requests
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
-        // FIX: Add delay to ensure toast shows before redirect
-        toast.success(`Welcome back, ${userData.name}!`, {
-          duration: 3000,
-          position: 'top-center',
-          style: {
-            background: '#800020',
-            color: '#D4AF37',
-            fontSize: '16px',
-            fontWeight: 'bold',
-          }
-        });
+        toast.success(`Welcome back, ${userData.name}!`);
         
-        // IMPORTANT: Redirect based on role with slight delay
+        // Redirect based on role
         const role = userData.role;
-        console.log('Redirecting based on role:', role);
-        
-        // Add delay to let toast show before redirect
         setTimeout(() => {
           if (role === 'admin') {
             window.location.href = '/admin/dashboard';
           } else if (role === 'vendor') {
             window.location.href = '/vendor/dashboard';
-          } else if (role === 'customer') {
-            window.location.href = '/customer/dashboard';
           } else {
-            window.location.href = '/';
+            window.location.href = '/customer/dashboard';
           }
         }, 500);
       }
     } catch (error) {
-      console.error('Login error:', error);
-      toast.error(error.response?.data?.message || 'Login failed');
+      // Check if 2FA is required
+      if (error.response?.data?.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setTempToken(email);
+        toast.info('Please enter your 2FA code');
+      } else {
+        toast.error(error.response?.data?.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const handleTwoFactorSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const response = await api.post('/auth/2fa/login', {
+        email: tempToken,
+        password,
+        token: twoFactorCode
+      });
+      
+      if (response.data.success) {
+        const { token, ...userData } = response.data.data;
+        
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        toast.success(`Welcome back, ${userData.name}!`);
+        
+        const role = userData.role;
+        setTimeout(() => {
+          if (role === 'admin') {
+            window.location.href = '/admin/dashboard';
+          } else if (role === 'vendor') {
+            window.location.href = '/vendor/dashboard';
+          } else {
+            window.location.href = '/customer/dashboard';
+          }
+        }, 500);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Invalid 2FA code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (requiresTwoFactor) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-900 to-primary-800 pt-24 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8"
+        >
+          <div className="text-center mb-8">
+            <ShieldCheckIcon className="w-16 h-16 text-gold-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-heading font-bold text-primary-900">Two-Factor Authentication</h1>
+            <p className="text-gray-600 mt-2">Enter the 6-digit code from your authenticator app</p>
+          </div>
+          
+          <form onSubmit={handleTwoFactorSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Verification Code
+              </label>
+              <input
+                type="text"
+                value={twoFactorCode}
+                onChange={(e) => setTwoFactorCode(e.target.value)}
+                placeholder="000000"
+                maxLength={6}
+                className="input-field text-center text-2xl tracking-widest"
+                required
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary py-3 disabled:opacity-50"
+            >
+              {loading ? 'Verifying...' : 'Verify & Login'}
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 to-primary-800 pt-24 flex items-center justify-center p-4">
@@ -92,7 +161,6 @@ const Login = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email Field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Email Address
@@ -110,7 +178,6 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Password Field with Show/Hide Button */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Password
@@ -128,13 +195,9 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gold-500 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gold-500"
               >
-                {showPassword ? (
-                  <EyeSlashIcon className="w-5 h-5" />
-                ) : (
-                  <EyeIcon className="w-5 h-5" />
-                )}
+                {showPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
               </button>
             </div>
           </div>
@@ -155,14 +218,6 @@ const Login = () => {
               Create an account
             </Link>
           </p>
-        </div>
-
-        {/* Test credentials hint */}
-        <div className="mt-8 p-4 bg-gray-50 rounded-lg text-xs text-gray-500">
-          <p className="font-semibold mb-2">Test Accounts:</p>
-          <p>Admin: admin@smartwed.com / Admin@2025!</p>
-          <p>Vendor: vendor@test.com / Vendor@2025!</p>
-          <p>Customer: customer@test.com / Customer@2025!</p>
         </div>
       </motion.div>
     </div>

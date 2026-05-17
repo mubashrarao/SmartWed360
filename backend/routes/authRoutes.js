@@ -9,6 +9,12 @@ const {
   updateProfile
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const { 
+  enableTwoFactor, 
+  verifyTwoFactor, 
+  twoFactorLogin,
+  disableTwoFactor
+} = require('../controllers/twoFactorController');
 
 // Public routes
 router.post('/send-verification', sendVerificationCode);
@@ -16,19 +22,14 @@ router.post('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerificationCode);
 router.post('/login', loginUser);
 
-// Protected routes
+// ============ 2FA ROUTES ============
+router.post('/2fa/login', twoFactorLogin);  
+
+// Protected routes (require login)
 router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
-
-// ============ 2FA ROUTES  ============
-
- const { 
-  enableTwoFactor, 
-  verifyTwoFactor, 
-  twoFactorLogin 
- } = require('../controllers/twoFactorController');
- router.post('/2fa/enable', protect, enableTwoFactor);
- router.post('/2fa/verify', protect, verifyTwoFactor);
- router.post('/2fa/login', twoFactorLogin);
+router.post('/2fa/enable', protect, enableTwoFactor);
+router.post('/2fa/verify', protect, verifyTwoFactor);
+router.post('/2fa/disable', protect, disableTwoFactor);
 
 module.exports = router;
