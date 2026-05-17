@@ -2,8 +2,7 @@ const Venue = require('../models/Venue');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const Category = require('../models/Category');
-const Notification = require('../models/Notification'); 
-const { sendApprovalEmail } = require('../services/emailService');
+const Notification = require('../models/Notification');
 
 // @desc    Get vendor dashboard stats
 const getVendorStats = async (req, res) => {
@@ -15,6 +14,10 @@ const getVendorStats = async (req, res) => {
     const pendingBookings = await Booking.countDocuments({ 
       vendor: req.user.id, 
       status: 'pending' 
+    });
+    const waitingPaymentBookings = await Booking.countDocuments({ 
+      vendor: req.user.id, 
+      status: 'waiting_payment' 
     });
     const approvedBookings = await Booking.countDocuments({ 
       vendor: req.user.id, 
@@ -28,6 +31,7 @@ const getVendorStats = async (req, res) => {
         activeVenues,
         totalBookings,
         pendingBookings,
+        waitingPaymentBookings,
         approvedBookings
       }
     });
@@ -179,6 +183,50 @@ const deleteVenue = async (req, res) => {
   }
 };
 
+// @desc    Upload venue images (FIXED - added this function)
+const uploadVenueImages = async (req, res) => {
+  try {
+    const venue = await Venue.findOne({ 
+      _id: req.params.id, 
+      vendor: req.user.id 
+    });
+
+    if (!venue) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Venue not found' 
+      });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please upload at least one image' 
+      });
+    }
+
+    const images = req.files.map(file => ({
+      url: file.path,
+      publicId: file.filename
+    }));
+
+    venue.images = [...venue.images, ...images];
+    await venue.save();
+
+    res.json({
+      success: true,
+      message: `${images.length} image(s) uploaded successfully`,
+      data: venue
+    });
+  } catch (error) {
+    console.error('Upload images error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error' 
+    });
+  }
+};
+
 // @desc    Get vendor bookings
 const getVendorBookings = async (req, res) => {
   try {
@@ -240,7 +288,7 @@ const updateBookingStatus = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    // When vendor approves, set to 'waiting_payment'
+    // When vendor approves, set to 'waiting_payment' instead of 'approved'
     let finalStatus = status;
     if (status === 'approved') {
       finalStatus = 'waiting_payment';
@@ -250,17 +298,16 @@ const updateBookingStatus = async (req, res) => {
     if (vendorNotes) booking.vendorNotes = vendorNotes;
     await booking.save();
 
-    // Send notification to customer
+    // Send notification to customer for payment
     if (finalStatus === 'waiting_payment') {
       await Notification.create({
         user: booking.customer._id,
         type: 'payment_required',
         title: 'Payment Required',
-        message: `Your booking for ${booking.venue.name} has been approved. Please pay 20% advance to confirm.`,
+        message: `Your booking for ${booking.venue.name} has been approved. Please pay 20% advance to confirm your booking.`,
         data: { bookingId: booking._id },
         priority: 'high'
       });
-      console.log(`Payment required notification sent to customer: ${booking.customer.email}`);
     }
 
     res.json({ 
@@ -270,7 +317,7 @@ const updateBookingStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('Update booking status error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
@@ -292,6 +339,7 @@ module.exports = {
   createVenue,
   updateVenue,
   deleteVenue,
+  uploadVenueImages,  
   getVendorBookings,
   updateBookingStatus,
   getCategories
