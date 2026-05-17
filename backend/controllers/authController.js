@@ -230,48 +230,68 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email }).select('+password');
     
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    // FIX: Check if vendor is approved BEFORE allowing login
-    if (user.role === 'vendor' && user.status !== 'active') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Your vendor account is pending approval from admin. Please wait for approval email.' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
       });
     }
 
-    // Check for rejected or suspended status
+    // Check if vendor is approved
+    if (user.role === 'vendor' && user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your vendor account is pending approval from admin'
+      });
+    }
+
     if (user.status === 'rejected') {
-      return res.status(403).json({ success: false, message: 'Your account has been rejected.' });
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been rejected'
+      });
     }
 
-    if (user.status === 'suspended') {
-      return res.status(403).json({ success: false, message: 'Your account has been suspended.' });
+    // ============ CHECK IF 2FA IS ENABLED ============
+    if (user.isTwoFactorEnabled) {
+      // Return requiresTwoFactor flag instead of token
+      return res.status(200).json({
+        success: true,
+        requiresTwoFactor: true,
+        message: '2FA verification required',
+        email: user.email
+      });
     }
 
+    // Generate token for users without 2FA
     const token = generateToken(user._id);
 
     res.json({
       success: true,
       data: {
+        token,
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         status: user.status,
-        token
+        isTwoFactorEnabled: user.isTwoFactorEnabled
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
   }
 };
 

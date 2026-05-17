@@ -19,7 +19,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [tempToken, setTempToken] = useState(null);
+  const [tempEmail, setTempEmail] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -28,6 +29,16 @@ const Login = () => {
 
     try {
       const response = await api.post('/auth/login', { email, password });
+      
+      // Check if 2FA is required
+      if (response.data.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setTempEmail(email);
+        setTempPassword(password);
+        toast.info('Please enter your 2FA code');
+        setLoading(false);
+        return;
+      }
       
       if (response.data.success) {
         const { token, ...userData } = response.data.data;
@@ -38,12 +49,10 @@ const Login = () => {
         
         toast.success(`Welcome back, ${userData.name}!`);
         
-        // Redirect based on role
-        const role = userData.role;
         setTimeout(() => {
-          if (role === 'admin') {
+          if (userData.role === 'admin') {
             window.location.href = '/admin/dashboard';
-          } else if (role === 'vendor') {
+          } else if (userData.role === 'vendor') {
             window.location.href = '/vendor/dashboard';
           } else {
             window.location.href = '/customer/dashboard';
@@ -51,14 +60,8 @@ const Login = () => {
         }, 500);
       }
     } catch (error) {
-      // Check if 2FA is required
-      if (error.response?.data?.requiresTwoFactor) {
-        setRequiresTwoFactor(true);
-        setTempToken(email);
-        toast.info('Please enter your 2FA code');
-      } else {
-        toast.error(error.response?.data?.message || 'Login failed');
-      }
+      console.error('Login error:', error);
+      toast.error(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -70,8 +73,8 @@ const Login = () => {
     
     try {
       const response = await api.post('/auth/2fa/login', {
-        email: tempToken,
-        password,
+        email: tempEmail,
+        password: tempPassword,
         token: twoFactorCode
       });
       
@@ -84,11 +87,10 @@ const Login = () => {
         
         toast.success(`Welcome back, ${userData.name}!`);
         
-        const role = userData.role;
         setTimeout(() => {
-          if (role === 'admin') {
+          if (userData.role === 'admin') {
             window.location.href = '/admin/dashboard';
-          } else if (role === 'vendor') {
+          } else if (userData.role === 'vendor') {
             window.location.href = '/vendor/dashboard';
           } else {
             window.location.href = '/customer/dashboard';
@@ -96,12 +98,14 @@ const Login = () => {
         }, 500);
       }
     } catch (error) {
+      console.error('2FA error:', error);
       toast.error(error.response?.data?.message || 'Invalid 2FA code');
     } finally {
       setLoading(false);
     }
   };
 
+  // 2FA Verification Screen
   if (requiresTwoFactor) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-900 to-primary-800 pt-24 flex items-center justify-center p-4">
@@ -127,17 +131,29 @@ const Login = () => {
                 onChange={(e) => setTwoFactorCode(e.target.value)}
                 placeholder="000000"
                 maxLength={6}
-                className="input-field text-center text-2xl tracking-widest"
+                className="w-full text-center text-2xl tracking-widest px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500"
                 required
+                autoFocus
               />
             </div>
             
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn-primary py-3 disabled:opacity-50"
+              className="w-full bg-primary-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-800 transition-colors disabled:opacity-50"
             >
               {loading ? 'Verifying...' : 'Verify & Login'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => {
+                setRequiresTwoFactor(false);
+                setTwoFactorCode('');
+              }}
+              className="w-full text-gold-500 hover:text-gold-600 text-sm"
+            >
+              Back to Login
             </button>
           </form>
         </motion.div>
@@ -145,6 +161,7 @@ const Login = () => {
     );
   }
 
+  // Normal Login Screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 to-primary-800 pt-24 flex items-center justify-center p-4">
       <motion.div
@@ -171,7 +188,7 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input-field pl-10"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500"
                 placeholder="you@example.com"
                 required
               />
@@ -188,7 +205,7 @@ const Login = () => {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input-field pl-10 pr-12"
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold-500"
                 placeholder="••••••••"
                 required
               />
@@ -205,7 +222,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full btn-primary py-3 disabled:opacity-50"
+            className="w-full bg-primary-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary-800 transition-colors disabled:opacity-50"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
