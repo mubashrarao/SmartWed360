@@ -231,45 +231,61 @@ const sendApprovalEmail = async (email, name) => {
 };
 // Send payment confirmation email
 const sendPaymentConfirmation = async (customer, booking) => {
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Booking Confirmed - SmartWed 360</title>
-      <style>
-        body { font-family: Arial, sans-serif; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #800020; color: #D4AF37; padding: 20px; text-align: center; }
-        .content { padding: 30px; border: 1px solid #ddd; }
-        .button { background: #D4AF37; color: #800020; padding: 12px 30px; text-decoration: none; border-radius: 5px; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>SmartWed 360</h1>
-        </div>
-        <div class="content">
-          <h2>Congratulations ${customer.name}!</h2>
-          <p>Your booking for <strong>${booking.venue.name}</strong> has been confirmed!</p>
-          <p>Advance Payment: Rs. ${booking.advancePayment.toLocaleString()}</p>
-          <p>Remaining Amount: Rs. ${(booking.totalPrice - booking.advancePayment).toLocaleString()}</p>
-          <p>Event Date: ${new Date(booking.eventDate).toLocaleDateString()}</p>
-          <div style="text-align: center; margin-top: 30px;">
-            <a href="${process.env.FRONTEND_URL}/customer/bookings" class="button">View Booking Details</a>
+  try {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Booking Confirmed - SmartWed 360</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #800020; color: #D4AF37; padding: 20px; text-align: center; }
+          .content { padding: 30px; background: #fff; border: 1px solid #e0e0e0; border-radius: 0 0 10px 10px; }
+          .success-box { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin: 20px 0; }
+          .button { display: inline-block; padding: 12px 30px; background: #D4AF37; color: #800020; text-decoration: none; border-radius: 5px; font-weight: bold; }
+          .footer { text-align: center; padding: 20px; font-size: 12px; color: #999; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>SmartWed 360</h1>
+          </div>
+          <div class="content">
+            <h2>Congratulations ${customer.name}!</h2>
+            <div class="success-box">
+              <p><strong>Your booking has been CONFIRMED!</strong></p>
+              <p>Venue: ${booking.venue.name}</p>
+              <p>Event Date: ${new Date(booking.eventDate).toLocaleDateString()}</p>
+              <p>Advance Payment: Rs. ${booking.advancePayment.toLocaleString()}</p>
+              <p>Remaining Amount: Rs. ${(booking.totalPrice - booking.advancePayment).toLocaleString()}</p>
+            </div>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.FRONTEND_URL}/customer/bookings" class="button">View My Bookings</a>
+            </div>
+          </div>
+          <div class="footer">
+            <p> 2025 SmartWed 360. All rights reserved.</p>
           </div>
         </div>
-      </div>
-    </body>
-    </html>
-  `;
-  
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
-    to: customer.email,
-    subject: 'Booking Confirmed - SmartWed 360',
-    html
-  });
+      </body>
+      </html>
+    `;
+    
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || `"SmartWed 360" <${process.env.EMAIL_USER}>`,
+      to: customer.email,
+      subject: 'Booking Confirmed - SmartWed 360',
+      html
+    });
+    console.log('Payment confirmation email sent to:', customer.email);
+    return true;
+  } catch (error) {
+    console.error('Payment confirmation email failed:', error.message);
+    return false;
+  }
 };
 
 module.exports = { 
