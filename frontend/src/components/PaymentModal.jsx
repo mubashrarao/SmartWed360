@@ -32,36 +32,46 @@ const PaymentForm = ({ bookingId, totalAmount, onSuccess, onClose }) => {
   }, [bookingId]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
+  e.preventDefault();
+  if (!stripe || !elements) return;
+  
+  setLoading(true);
+  
+  try {
+    const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: {
+        card: elements.getElement(CardElement)
+      }
+    });
     
-    setLoading(true);
+    if (error) {
+      console.error('Stripe error:', error);
+      toast.error(error.message);
+      setLoading(false);
+      return;
+    }
     
-    try {
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement)
-        }
+    if (paymentIntent.status === 'succeeded') {
+      // Confirm payment in backend
+      const confirmResponse = await api.post('/payments/confirm', {
+        paymentIntentId: paymentIntent.id,
+        bookingId
       });
       
-      if (error) {
-        toast.error(error.message);
-      } else if (paymentIntent.status === 'succeeded') {
-        // Confirm payment in backend
-        await api.post('/payments/confirm', {
-          paymentIntentId: paymentIntent.id,
-          bookingId
-        });
-        
-        toast.success('Payment successful! Your booking is confirmed.');
+      if (confirmResponse.data.success) {
+        toast.success(confirmResponse.data.message);
         onSuccess();
+      } else {
+        toast.error(confirmResponse.data.message || 'Payment confirmation failed');
       }
-    } catch (error) {
-      toast.error('Payment failed. Please try again.');
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Payment error:', error);
+    toast.error(error.response?.data?.message || 'Payment failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const cardElementOptions = {
     style: {

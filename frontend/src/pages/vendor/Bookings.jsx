@@ -20,6 +20,7 @@ const VendorBookings = () => {
   const [filter, setFilter] = useState('all');
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [responseNotes, setResponseNotes] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     fetchBookings();
@@ -38,18 +39,28 @@ const VendorBookings = () => {
     }
   };
 
+  // ============ FIXED handleStatusUpdate with better error handling ============
   const handleStatusUpdate = async (bookingId, status) => {
+    setActionLoading(true);
     try {
-      await api.put(`/vendor/bookings/${bookingId}`, {
-        status,
+      const response = await api.put(`/vendor/bookings/${bookingId}`, {
+        status: status,
         vendorNotes: responseNotes
       });
-      toast.success(`Booking ${status} successfully`);
-      setSelectedBooking(null);
-      setResponseNotes('');
-      fetchBookings();
+      
+      if (response.data.success) {
+        toast.success(response.data.message || `Booking ${status} successfully`);
+        setSelectedBooking(null);
+        setResponseNotes('');
+        fetchBookings(); // Refresh the list
+      } else {
+        toast.error(response.data.message || 'Update failed');
+      }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Update failed');
+      console.error('Status update error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update booking status');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -95,28 +106,28 @@ const VendorBookings = () => {
             <p className="text-2xl font-bold text-yellow-600">{stats.pending || 0}</p>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Approved</p>
-            <p className="text-2xl font-bold text-green-600">{stats.approved || 0}</p>
+            <p className="text-sm text-gray-500">Waiting Payment</p>
+            <p className="text-2xl font-bold text-orange-600">{stats.waiting_payment || 0}</p>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <p className="text-sm text-gray-500">Completed</p>
-            <p className="text-2xl font-bold text-gold-600">{stats.completed || 0}</p>
+            <p className="text-sm text-gray-500">Approved</p>
+            <p className="text-2xl font-bold text-green-600">{stats.approved || 0}</p>
           </div>
         </div>
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
-          {['all', 'pending', 'approved', 'rejected', 'cancelled', 'completed'].map((status) => (
+          {['all', 'pending', 'waiting_payment', 'approved', 'rejected', 'cancelled', 'completed'].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-full font-medium capitalize ${
+              className={`px-4 py-2 rounded-full font-medium capitalize whitespace-nowrap ${
                 filter === status
                   ? 'bg-primary-900 text-white'
                   : 'bg-white text-gray-600 hover:bg-gold-100'
               }`}
             >
-              {status}
+              {status === 'waiting_payment' ? 'Waiting Payment' : status}
             </button>
           ))}
         </div>
@@ -153,7 +164,7 @@ const VendorBookings = () => {
                     </div>
                   </div>
                   <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusBadge(booking.status)}`}>
-                    {booking.status}
+                    {booking.status === 'waiting_payment' ? 'WAITING PAYMENT' : booking.status.toUpperCase()}
                   </span>
                 </div>
 
@@ -184,6 +195,7 @@ const VendorBookings = () => {
                   </div>
                 )}
 
+                {/* Action Buttons */}
                 {selectedBooking === booking._id ? (
                   <div className="space-y-4">
                     <textarea
@@ -196,14 +208,20 @@ const VendorBookings = () => {
                     <div className="flex gap-3">
                       <button
                         onClick={() => handleStatusUpdate(booking._id, 'approved')}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                        disabled={actionLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50"
                       >
-                        <CheckCircleIcon className="w-4 h-4" />
+                        {actionLoading ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <CheckCircleIcon className="w-4 h-4" />
+                        )}
                         Approve
                       </button>
                       <button
                         onClick={() => handleStatusUpdate(booking._id, 'rejected')}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                        disabled={actionLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
                       >
                         <XCircleIcon className="w-4 h-4" />
                         Reject
@@ -226,6 +244,15 @@ const VendorBookings = () => {
                       Respond to Request
                     </button>
                   )
+                )}
+
+                {/* Payment Required Message for waiting_payment status */}
+                {booking.status === 'waiting_payment' && (
+                  <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-sm text-orange-700">
+                      <span className="font-semibold">Waiting for Payment:</span> Customer needs to pay 20% advance to confirm this booking.
+                    </p>
+                  </div>
                 )}
 
                 {booking.vendorNotes && (

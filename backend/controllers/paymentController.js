@@ -69,6 +69,10 @@ const confirmPayment = async (req, res) => {
   try {
     const { paymentIntentId, bookingId } = req.body;
     
+    if (!paymentIntentId || !bookingId) {
+      return res.status(400).json({ success: false, message: 'Missing paymentIntentId or bookingId' });
+    }
+    
     // Retrieve payment intent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
@@ -101,19 +105,12 @@ const confirmPayment = async (req, res) => {
     booking.status = 'approved';
     await booking.save();
     
-    // Send confirmation email
-    try {
-      await sendPaymentConfirmation(booking.customer, booking);
-    } catch (emailError) {
-      console.error('Email error:', emailError.message);
-    }
-    
     // Send notification to customer
     await Notification.create({
       user: booking.customer._id,
       type: 'booking_confirmed',
       title: 'Booking Confirmed!',
-      message: `Your booking for ${booking.venue.name} has been confirmed. Advance payment of Rs. ${payment.advanceAmount.toLocaleString()} received.`,
+      message: `Your booking for ${booking.venue.name} has been confirmed. Advance payment received.`,
       data: { bookingId: booking._id },
       priority: 'high'
     });
@@ -128,10 +125,23 @@ const confirmPayment = async (req, res) => {
       priority: 'high'
     });
     
+    // Send email confirmation
+    try {
+      const { sendPaymentConfirmation } = require('../services/emailService');
+      await sendPaymentConfirmation(booking.customer, booking);
+    } catch (emailError) {
+      console.error('Email error:', emailError.message);
+    }
+    
     res.json({
       success: true,
       message: 'Payment confirmed! Your booking is now confirmed.',
-      paymentId: payment._id
+      paymentId: payment._id,
+      data: {
+        bookingStatus: booking.status,
+        paymentStatus: booking.paymentStatus,
+        advancePaid: booking.advancePayment
+      }
     });
   } catch (error) {
     console.error('Confirm payment error:', error);

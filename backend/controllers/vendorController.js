@@ -310,17 +310,21 @@ const updateBookingStatus = async (req, res) => {
       });
     }
 
+    // Return updated booking data
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate('customer', 'name email')
+      .populate('venue', 'name price city images');
+
     res.json({ 
       success: true, 
-      message: `Booking ${status === 'approved' ? 'approved, waiting for payment' : status}`, 
-      data: booking 
+      message: status === 'approved' ? 'Booking approved. Waiting for customer payment.' : `Booking ${status} successfully`,
+      data: updatedBooking
     });
   } catch (error) {
     console.error('Update booking status error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
-
 // @desc    Get categories for dropdown
 const getCategories = async (req, res) => {
   try {
