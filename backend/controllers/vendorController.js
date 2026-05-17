@@ -2,6 +2,7 @@ const Venue = require('../models/Venue');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const Category = require('../models/Category');
+const Notification = require('../models/Notification');
 
 // @desc    Get vendor dashboard stats
 const getVendorStats = async (req, res) => {

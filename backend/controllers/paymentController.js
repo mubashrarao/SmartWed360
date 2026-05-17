@@ -3,6 +3,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
+const { sendPaymentConfirmation } = require('../services/emailService');
 
 // Create payment intent for booking advance
 const createPaymentIntent = async (req, res) => {
@@ -72,23 +74,35 @@ const confirmPayment = async (req, res) => {
     
     // Update payment record
     const payment = await Payment.findOne({ paymentIntentId });
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment record not found' });
+    }
+    
     payment.status = 'paid';
     payment.transactionId = paymentIntent.id;
     await payment.save();
     
-    // Update booking - CHANGE STATUS TO 'approved' AFTER PAYMENT
+    // Update booking
     const booking = await Booking.findById(bookingId)
       .populate('customer')
       .populate('venue')
       .populate('vendor');
     
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+    
     booking.paymentStatus = 'paid';
     booking.advancePayment = payment.advanceAmount;
-    booking.status = 'approved';  // Booking is now confirmed
+    booking.status = 'approved';
     await booking.save();
     
     // Send confirmation email
-    await sendPaymentConfirmation(booking.customer, booking);
+    try {
+      await sendPaymentConfirmation(booking.customer, booking);
+    } catch (emailError) {
+      console.error('Email error:', emailError.message);
+    }
     
     // Send notification to customer
     await Notification.create({
