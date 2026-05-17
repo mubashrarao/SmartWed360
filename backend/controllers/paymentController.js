@@ -3,7 +3,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
-const { sendPaymentConfirmation } = require('../services/emailService');
 
 // Create payment intent for booking advance
 const createPaymentIntent = async (req, res) => {
@@ -18,22 +17,19 @@ const createPaymentIntent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
     
-    // Calculate advance amount (20% of total by default)
     const advanceAmount = (booking.totalPrice * advancePercentage) / 100;
     
-    // Create payment intent with Stripe
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(advanceAmount * 100), // Convert to cents/paisa
+      amount: Math.round(advanceAmount * 100),
       currency: 'pkr',
       metadata: {
         bookingId: booking._id.toString(),
         customerId: booking.customer._id.toString(),
         vendorId: booking.vendor.toString()
       },
-      description: `Advance payment for ${booking.venue.name} on ${new Date(booking.eventDate).toLocaleDateString()}`
+      description: `Advance payment for ${booking.venue.name}`
     });
     
-    // Create payment record
     const payment = await Payment.create({
       booking: bookingId,
       customer: req.user.id,
@@ -44,7 +40,6 @@ const createPaymentIntent = async (req, res) => {
       status: 'pending'
     });
     
-    // Update booking with payment info
     booking.advancePayment = advanceAmount;
     booking.paymentStatus = 'partial';
     booking.paymentId = payment._id;
@@ -68,26 +63,20 @@ const confirmPayment = async (req, res) => {
   try {
     const { paymentIntentId, bookingId } = req.body;
     
-    // Retrieve payment intent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
     if (paymentIntent.status !== 'succeeded') {
       return res.status(400).json({ success: false, message: 'Payment not successful' });
     }
     
-    // Update payment record
     const payment = await Payment.findOne({ paymentIntentId });
     payment.status = 'paid';
     payment.transactionId = paymentIntent.id;
     await payment.save();
     
-    // Update booking
     const booking = await Booking.findById(bookingId);
     booking.paymentStatus = 'paid';
     await booking.save();
-    
-    // Send confirmation email
-    await sendPaymentConfirmation(booking.customer, booking);
     
     res.json({
       success: true,
@@ -117,7 +106,7 @@ const getPaymentStatus = async (req, res) => {
   }
 };
 
-// Webhook to handle Stripe events
+// Webhook handler
 const stripeWebhook = async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
@@ -132,18 +121,13 @@ const stripeWebhook = async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   
-  // Handle the event
   switch (event.type) {
     case 'payment_intent.succeeded':
-      const paymentIntent = event.data.object;
-      console.log(`PaymentIntent succeeded: ${paymentIntent.id}`);
+      console.log(`PaymentIntent succeeded: ${event.data.object.id}`);
       break;
     case 'payment_intent.payment_failed':
-      const failedPayment = event.data.object;
-      console.log(`Payment failed: ${failedPayment.id}`);
+      console.log(`Payment failed: ${event.data.object.id}`);
       break;
-    default:
-      console.log(`Unhandled event type ${event.type}`);
   }
   
   res.json({ received: true });
