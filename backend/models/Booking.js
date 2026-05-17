@@ -51,11 +51,21 @@ const BookingSchema = new mongoose.Schema({
   // Vendor Response
   vendorNotes: { type: String, maxlength: 500 },
   
+  // ===== PAYMENT FIELDS (Added) =====
+  advancePayment: {
+    type: Number,
+    default: 0
+  },
   paymentStatus: {
     type: String,
     enum: ['pending', 'partial', 'paid', 'refunded'],
     default: 'pending'
   },
+  paymentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Payment'
+  },
+  // ===== END OF PAYMENT FIELDS =====
   
   // Auto-completion tracking
   autoCompleted: { type: Boolean, default: false }

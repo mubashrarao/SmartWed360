@@ -11,7 +11,11 @@ connectDB();
 
 const app = express();
 
-// Body parser
+// ==================== IMPORTANT: Webhook needs raw body BEFORE express.json() ====================
+// Webhook route must come BEFORE express.json() to receive raw body
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), require('./routes/paymentRoutes'));
+
+// Body parser for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -34,6 +38,9 @@ app.use('/api/customer', require('./routes/customerRoutes')); // Customer only
 app.use('/api/bookings', require('./routes/bookingRoutes'));  // All authenticated users
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/recommendations', require('./routes/recommendationRoutes'));
+
+// ==================== PAYMENT ROUTES ====================
+app.use('/api/payments', require('./routes/paymentRoutes'));
 
 // Health check
 app.get('/health', (req, res) => {

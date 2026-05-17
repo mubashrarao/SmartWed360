@@ -15,6 +15,9 @@ router.post('/send-verification', sendVerificationCode);
 router.post('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerificationCode);
 router.post('/login', loginUser);
+router.post('/2fa/enable', protect, enableTwoFactor);
+router.post('/2fa/verify', protect, verifyTwoFactor);
+router.post('/2fa/login', twoFactorLogin);
 
 // Protected routes
 router.get('/profile', protect, getProfile);

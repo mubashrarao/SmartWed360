@@ -37,7 +37,15 @@ const UserSchema = new mongoose.Schema({
   profileImage: {
     type: String,
     default: 'default-profile.png'
-  }
+  },
+  twoFactorSecret: {
+  type: String,
+  default: null
+},
+isTwoFactorEnabled: {
+  type: Boolean,
+  default: false
+}
 }, {
   timestamps: true
 });

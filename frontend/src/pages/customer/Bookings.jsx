@@ -9,10 +9,12 @@ import {
   XMarkIcon,
   CheckIcon,
   ClockIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import api from '../../services/api';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import PaymentModal from '../../components/PaymentModal';
 import toast from 'react-hot-toast';
 
 const CustomerBookings = () => {
@@ -20,6 +22,8 @@ const CustomerBookings = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [actionLoading, setActionLoading] = useState(null);
+  const [showPayment, setShowPayment] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   useEffect(() => {
     fetchBookings();
@@ -64,7 +68,6 @@ const CustomerBookings = () => {
     
     setActionLoading(bookingId);
     try {
-      // Using the /complete endpoint (not /status)
       await api.put(`/bookings/${bookingId}/complete`);
       toast.success('Booking marked as completed!');
       fetchBookings();
@@ -206,12 +209,27 @@ const CustomerBookings = () => {
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Booked on</p>
-                          <p className="font-semibold text-primary-900">
-                            {new Date(booking.createdAt).toLocaleDateString()}
+                          <p className="text-xs text-gray-500 mb-1">Advance Paid</p>
+                          <p className="font-semibold text-primary-900 flex items-center gap-1">
+                            <CurrencyRupeeIcon className="w-4 h-4 text-green-500" />
+                            Rs. {booking.advancePayment?.toLocaleString() || '0'}
                           </p>
                         </div>
                       </div>
+
+                      {/* Payment Status Badge */}
+                      {booking.paymentStatus && booking.paymentStatus !== 'pending' && (
+                        <div className="mb-3">
+                          <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${
+                            booking.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+                            booking.paymentStatus === 'partial' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            <CreditCardIcon className="w-3 h-3" />
+                            Payment: {booking.paymentStatus.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Special Requests */}
                       {booking.specialRequests && (
@@ -233,6 +251,20 @@ const CustomerBookings = () => {
 
                       {/* Action Buttons */}
                       <div className="flex flex-wrap gap-3 mt-4">
+                        {/* Pay Advance Button - For approved bookings with pending payment */}
+                        {booking.status === 'approved' && booking.paymentStatus !== 'paid' && (
+                          <button
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setShowPayment(true);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-gold-500 text-primary-900 rounded-lg hover:bg-gold-600 transition-colors"
+                          >
+                            <CreditCardIcon className="w-4 h-4" />
+                            Pay Advance (20%)
+                          </button>
+                        )}
+
                         {/* Cancel Button - Only for pending bookings */}
                         {booking.status === 'pending' && (
                           <button
@@ -281,6 +313,24 @@ const CustomerBookings = () => {
           </div>
         )}
       </div>
+
+      {/* Payment Modal */}
+      {showPayment && selectedBooking && (
+        <PaymentModal
+          bookingId={selectedBooking._id}
+          totalAmount={selectedBooking.totalPrice}
+          onSuccess={() => {
+            setShowPayment(false);
+            setSelectedBooking(null);
+            fetchBookings();
+            toast.success('Payment successful! Booking confirmed.');
+          }}
+          onClose={() => {
+            setShowPayment(false);
+            setSelectedBooking(null);
+          }}
+        />
+      )}
     </div>
   );
 };
