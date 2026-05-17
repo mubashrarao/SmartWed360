@@ -14,11 +14,14 @@ const NotificationSchema = new mongoose.Schema({
       'booking_approved',      // Vendor approved booking
       'booking_rejected',      // Vendor rejected booking
       'booking_cancelled',     // Customer cancelled booking
+      'booking_confirmed',     // Payment received, booking confirmed
+      'payment_required',      // Customer needs to pay advance
+      'payment_received',      // Vendor received payment
       'vendor_approved',       // Admin approved vendor
       'vendor_rejected',       // Admin rejected vendor
+      'vendor_pending',        // New vendor registration
       'event_reminder',        // Upcoming event reminder
-      'payment_received',      // Payment received
-      'system_alert'           // System notifications
+      'event_completed'        // Event marked as completed
     ],
     required: true
   },
@@ -35,10 +38,6 @@ const NotificationSchema = new mongoose.Schema({
     default: {}
   },
   isRead: {
-    type: Boolean,
-    default: false
-  },
-  isEmailSent: {
     type: Boolean,
     default: false
   },

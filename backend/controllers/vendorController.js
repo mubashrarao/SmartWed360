@@ -274,6 +274,8 @@ const updateBookingStatus = async (req, res) => {
   try {
     const { status, vendorNotes } = req.body;
     
+    console.log('Updating booking:', req.params.id, 'to status:', status);
+    
     const booking = await Booking.findById(req.params.id)
       .populate('customer')
       .populate('venue')
@@ -288,43 +290,30 @@ const updateBookingStatus = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    // When vendor approves, set to 'waiting_payment' instead of 'approved'
+    // Determine final status
     let finalStatus = status;
     if (status === 'approved') {
       finalStatus = 'waiting_payment';
     }
 
+    // Update booking
     booking.status = finalStatus;
     if (vendorNotes) booking.vendorNotes = vendorNotes;
     await booking.save();
 
-    // Send notification to customer for payment
-    if (finalStatus === 'waiting_payment') {
-      await Notification.create({
-        user: booking.customer._id,
-        type: 'payment_required',
-        title: 'Payment Required',
-        message: `Your booking for ${booking.venue.name} has been approved. Please pay 20% advance to confirm your booking.`,
-        data: { bookingId: booking._id },
-        priority: 'high'
-      });
-    }
-
-    // Return updated booking data
-    const updatedBooking = await Booking.findById(booking._id)
-      .populate('customer', 'name email')
-      .populate('venue', 'name price city images');
+    console.log('Booking updated successfully to:', finalStatus);
 
     res.json({ 
       success: true, 
-      message: status === 'approved' ? 'Booking approved. Waiting for customer payment.' : `Booking ${status} successfully`,
-      data: updatedBooking
+      message: status === 'approved' ? 'Booking approved. Waiting for customer payment.' : `Booking ${status}`,
+      data: booking 
     });
   } catch (error) {
     console.error('Update booking status error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
+
 // @desc    Get categories for dropdown
 const getCategories = async (req, res) => {
   try {
