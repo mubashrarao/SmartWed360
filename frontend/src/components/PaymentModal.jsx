@@ -5,7 +5,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
-const stripePromise = loadStripe('pk_test_xxxxxxxxxxxxx'); // Replace with your publishable key
+const stripePromise = loadStripe('pk_test_51TWDewFxsgeF8m4dVWkw8ZO0KixZjbi0gXJ21dnw5jimDtsNBTNU540a6yhbJduA38xEry6bpJ37818IKm1dtkwi00F9ASUFA7'); // Replace with your publishable key
 
 const PaymentForm = ({ bookingId, totalAmount, onSuccess, onClose }) => {
   const stripe = useStripe();
