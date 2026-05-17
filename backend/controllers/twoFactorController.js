@@ -112,6 +112,7 @@ const twoFactorLogin = async (req, res) => {
       expiresIn: '30d'
     });
     
+    // ============ RETURN COMPLETE USER DATA WITH isTwoFactorEnabled ============
     res.json({
       success: true,
       data: {
@@ -121,7 +122,10 @@ const twoFactorLogin = async (req, res) => {
         email: user.email,
         role: user.role,
         status: user.status,
-        isTwoFactorEnabled: user.isTwoFactorEnabled
+        isTwoFactorEnabled: user.isTwoFactorEnabled,  // ✅ IMPORTANT: This must be included
+        phone: user.phone,
+        profileImage: user.profileImage,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
